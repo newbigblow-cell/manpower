@@ -1,42 +1,39 @@
-async function submitAvailability(availableDays) {
-    const staffId = localStorage.getItem('staffId');
-    const deviceToken = localStorage.getItem('deviceToken');
+async function registerDevice() {
+    const staffId = document.getElementById('staffId').value.trim();
     
-    if (!staffId || !deviceToken) {
-        alert("Please register your device first");
+    if (!staffId) {
+        showError("Please enter your Staff ID");
         return;
     }
 
-    const submissionData = {
-        staffId: staffId,
-        deviceToken: deviceToken,
-        availableWorkingDays: availableDays.join(','),
-        targetMonth: new Date().getMonth() + 2, // Next month
-        targetYear: new Date().getFullYear(),
-        shift: "day" // or get from UI
-    };
-
     try {
-        const response = await fetch('https://your-n8n-domain/staff-submission', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submissionData)
+        // Use GET request with query parameter
+        const response = await fetch(`https://your-n8n-domain.com/staff-registration?staffId=${encodeURIComponent(staffId)}`, {
+            method: 'GET', // Changed to GET
+            headers: { 
+                'Content-Type': 'application/json' 
+            }
+            // No body for GET requests
         });
 
         const result = await response.json();
 
         if (result.success) {
-            alert("Availability submitted successfully!");
+            localStorage.setItem('deviceToken', result.newToken);
+            localStorage.setItem('staffId', result.staffId);
+            localStorage.setItem('staffName', result.staffName);
+            
+            showSuccess("Device registered successfully!");
+            setTimeout(() => showMainApp(), 2000);
         } else {
-            if (result.error === "TOKEN_MISMATCH") {
-                alert("Security issue detected. Please re-register your device.");
-                localStorage.clear();
-                location.reload();
+            if (result.error === "ALREADY_REGISTERED") {
+                showError("This Staff ID is already registered with another device.");
+                document.getElementById('admin-contact').style.display = 'block';
             } else {
-                alert("Submission failed: " + result.message);
+                showError(result.message);
             }
         }
     } catch (error) {
-        alert("Network error. Please try again.");
+        showError("Network error. Please try again.");
     }
 }
