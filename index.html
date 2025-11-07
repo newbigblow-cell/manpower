@@ -51,7 +51,7 @@
             }
 
             try {
-                const response = await fetch('https://your-n8n-domain/staff-registration', {
+                const response = await fetch('https://n8n.hdd.hk/webhook/manpower-staff-registration', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ staffId: staffId })
@@ -99,4 +99,5 @@
         }
     </script>
 </body>
+
 </html>
