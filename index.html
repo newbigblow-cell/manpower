@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Staff Registration</title>
+    <style>
+        .container { max-width: 400px; margin: 50px auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; }
+        .error { color: red; display: none; }
+        .success { color: green; display: none; }
+        .admin-contact { display: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Staff Device Registration</h2>
+        
+        <div id="registration-form">
+            <div class="form-group">
+                <input type="text" id="staffId" placeholder="Enter your Staff ID" required>
+            </div>
+            <button onclick="registerDevice()">Register This Device</button>
+        </div>
+
+        <div id="error-message" class="error"></div>
+        <div id="success-message" class="success"></div>
+        
+        <div id="admin-contact" class="admin-contact">
+            <p>If you changed your phone, please contact admin to reset your registration.</p>
+            <p><strong>Admin Contact:</strong> 1234-5678</p>
+        </div>
+
+        <div id="main-app" style="display:none;">
+            <h3>Welcome, <span id="staff-name"></span>!</h3>
+            <!-- Your calendar interface goes here -->
+        </div>
+    </div>
+
+    <script>
+        // Check if already registered
+        if (localStorage.getItem('deviceToken')) {
+            showMainApp();
+        }
+
+        async function registerDevice() {
+            const staffId = document.getElementById('staffId').value.trim();
+            
+            if (!staffId) {
+                showError("Please enter your Staff ID");
+                return;
+            }
+
+            try {
+                const response = await fetch('https://your-n8n-domain/staff-registration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ staffId: staffId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Store token locally
+                    localStorage.setItem('deviceToken', result.deviceToken);
+                    localStorage.setItem('staffId', result.staffId);
+                    localStorage.setItem('staffName', result.staffName);
+                    
+                    showSuccess("Device registered successfully!");
+                    setTimeout(() => showMainApp(), 2000);
+                } else {
+                    if (result.error === "ALREADY_REGISTERED") {
+                        showError("This Staff ID is already registered with another device.");
+                        document.getElementById('admin-contact').style.display = 'block';
+                    } else {
+                        showError(result.message);
+                    }
+                }
+            } catch (error) {
+                showError("Network error. Please try again.");
+            }
+        }
+
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            document.getElementById('error-message').style.display = 'block';
+            document.getElementById('success-message').style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            document.getElementById('success-message').textContent = message;
+            document.getElementById('success-message').style.display = 'block';
+            document.getElementById('error-message').style.display = 'none';
+        }
+
+        function showMainApp() {
+            document.getElementById('registration-form').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('staff-name').textContent = localStorage.getItem('staffName');
+        }
+    </script>
+</body>
+</html>
