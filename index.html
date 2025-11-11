@@ -24,16 +24,16 @@
         .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 6px; }
         .tab.active { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .message { padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
-        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
-        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
     <h1>Staff Management</h1>
 
     <div class="tab-switcher">
-        <div class="tab active" data-panel="registration">Registration</div>
-        <div class="tab" data-panel="submission">Submission</div>
+        <div class="tab active" onclick="showPanel('registration')">Registration</div>
+        <div class="tab" onclick="showPanel('submission')">Submission</div>
     </div>
 
     <!-- Registration Panel -->
@@ -56,7 +56,7 @@
             <input type="tel" id="mobile" placeholder="Enter your mobile number">
         </div>
 
-        <button id="registerBtn">Register</button>
+        <button onclick="registerStaff()">Register</button>
     </div>
 
     <!-- Submission Panel -->
@@ -71,9 +71,7 @@
 
         <div class="form-group">
             <label for="targetMonth">Target Month:</label>
-            <select id="targetMonth">
-                <!-- Options will be populated by JavaScript -->
-            </select>
+            <select id="targetMonth"></select>
         </div>
 
         <div class="form-group">
@@ -86,11 +84,11 @@
         </div>
 
         <div class="form-group">
-            <label>Available Working Days (comma separated):</label>
+            <label>Available Working Days (comma separated numbers):</label>
             <input type="text" id="availableWorkingDays" placeholder="e.g., 1,2,3,5,7,8,10,12,13,14,15,18,19,20,22,23,25,26,27,28,30">
         </div>
 
-        <button id="submitBtn">Submit Working Days</button>
+        <button onclick="submitWorkingDays()">Submit Working Days</button>
     </div>
 
     <script>
@@ -100,7 +98,6 @@
 
         // Show/hide panels
         function showPanel(panelName) {
-            console.log('Showing panel:', panelName);
             document.querySelectorAll('.panel').forEach(panel => {
                 panel.classList.remove('active');
             });
@@ -109,7 +106,7 @@
             });
 
             document.getElementById(panelName + 'Panel').classList.add('active');
-            document.querySelector(`[data-panel="${panelName}"]`).classList.add('active');
+            event.target.classList.add('active');
         }
 
         // Show message
@@ -117,6 +114,7 @@
             const messageElement = document.getElementById(elementId);
             messageElement.textContent = message;
             messageElement.className = `message ${type}`;
+            messageElement.style.display = 'block';
         }
 
         // Populate month dropdown
@@ -163,8 +161,6 @@
                 return;
             }
 
-            console.log('Registering staff:', { staffId, staffName, mobile });
-
             try {
                 const response = await fetch(REGISTRATION_WEBHOOK, {
                     method: 'POST',
@@ -178,9 +174,7 @@
                     })
                 });
 
-                console.log('Response status:', response.status);
                 const result = await response.json();
-                console.log('Response data:', result);
 
                 if (response.ok) {
                     localStorage.setItem('staffId', staffId);
@@ -196,7 +190,6 @@
                     showMessage('registrationMessage', `Registration failed: ${result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                console.error('Registration error:', error);
                 showMessage('registrationMessage', `Registration error: ${error.message}`, 'error');
             }
         }
@@ -223,8 +216,6 @@
                 return;
             }
 
-            console.log('Submitting:', { staffId, targetMonth, shift, availableWorkingDays });
-
             try {
                 const response = await fetch(SUBMISSION_WEBHOOK, {
                     method: 'POST',
@@ -241,9 +232,7 @@
                     })
                 });
 
-                console.log('Submission response status:', response.status);
                 const result = await response.json();
-                console.log('Submission response data:', result);
 
                 if (response.ok && result.success) {
                     showMessage('submissionMessage', `Success! ${result.message}`, 'success');
@@ -252,32 +241,16 @@
                     showMessage('submissionMessage', `Submission failed: ${result.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                console.error('Submission error:', error);
                 showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
             }
         }
 
-        // Initialize app
-        function initApp() {
-            console.log('Initializing app...');
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', function() {
             populateMonthDropdown();
             loadStaffData();
-
-            // Add event listeners
-            document.getElementById('registerBtn').addEventListener('click', registerStaff);
-            document.getElementById('submitBtn').addEventListener('click', submitWorkingDays);
-            
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    showPanel(this.getAttribute('data-panel'));
-                });
-            });
-
-            console.log('App initialized successfully');
-        }
-
-        // Start the app when page loads
-        document.addEventListener('DOMContentLoaded', initApp);
+            console.log('PWA loaded successfully');
+        });
     </script>
 </body>
 </html>
