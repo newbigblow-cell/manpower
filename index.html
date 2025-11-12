@@ -356,6 +356,27 @@
         }
 
         // Submit working days
+
+
+// Add this to your submitWorkingDays function
+async function submitWorkingDays() {
+    // DEBUG: Check what token we have
+    const storedToken = tokenManager.getStoredToken();
+    const staffId = localStorage.getItem('staffId');
+    
+    console.log('DEBUG - Before submission:');
+    console.log('Stored staffId:', staffId);
+    console.log('Stored token:', storedToken);
+    console.log('Token length:', storedToken ? storedToken.length : 'none');
+    
+    if (!staffId || !storedToken) {
+        showMessage('submissionMessage', 'Please register first - no token found', 'error');
+        return;
+    }
+    
+    // Rest of your submission code...
+}
+
         async function submitWorkingDays() {
             const staffId = localStorage.getItem('staffId');
             const staffDeviceToken = tokenManager.getStoredToken(); // CHANGED: variable name
@@ -476,3 +497,4 @@
     </script>
 </body>
 </html>
+
