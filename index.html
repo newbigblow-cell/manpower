@@ -109,7 +109,7 @@
 
         <div class="token-display">
             <strong>Device Token:</strong> 
-            <span id="deviceTokenDisplay" class="token-value">••••••••</span>
+            <span id="staffDeviceTokenDisplay" class="token-value">••••••••</span>
             <button class="toggle-visibility" onclick="toggleTokenVisibility()">Show</button>
         </div>
 
@@ -138,7 +138,7 @@
         // Device Token Manager
         class DeviceTokenManager {
             constructor() {
-                this.storageKey = 'manpowerDeviceToken';
+                this.storageKey = 'manpowerStaffDeviceToken'; // Changed key name
                 this.tokenVisible = false;
             }
 
@@ -147,7 +147,7 @@
                 const timestamp = Date.now();
                 const random = Math.random().toString(36).substr(2, 9);
                 const userAgent = navigator.userAgent.substring(0, 3).replace(/[^a-zA-Z]/g, '');
-                return `dev-${timestamp}-${random}-${userAgent}`;
+                return `staff-dev-${timestamp}-${random}-${userAgent}`;
             }
 
             // Get stored device token
@@ -179,7 +179,7 @@
 
             // Update token display in settings
             updateTokenDisplay() {
-                const tokenDisplay = document.getElementById('deviceTokenDisplay');
+                const tokenDisplay = document.getElementById('staffDeviceTokenDisplay');
                 const storedToken = this.getStoredToken();
                 
                 if (storedToken) {
@@ -313,7 +313,7 @@
 
             try {
                 // Generate device token
-                const deviceToken = tokenManager.generateDeviceToken();
+                const staffDeviceToken = tokenManager.generateDeviceToken();
                 
                 const response = await fetch(REGISTRATION_WEBHOOK, {
                     method: 'POST',
@@ -324,7 +324,7 @@
                         staffId: staffId,
                         staffName: staffName,
                         mobile: mobile,
-                        deviceToken: deviceToken,
+                        staffDeviceToken: staffDeviceToken, // CHANGED: deviceToken → staffDeviceToken
                         operation: 'complete_registration'
                     })
                 });
@@ -338,7 +338,7 @@
                     localStorage.setItem('staffId', staffId);
                     localStorage.setItem('staffName', staffName);
                     localStorage.setItem('mobile', mobile);
-                    tokenManager.storeToken(deviceToken);
+                    tokenManager.storeToken(staffDeviceToken);
 
                     // Update UI
                     document.getElementById('displayStaffId').textContent = staffId;
@@ -358,12 +358,12 @@
         // Submit working days
         async function submitWorkingDays() {
             const staffId = localStorage.getItem('staffId');
-            const deviceToken = tokenManager.getStoredToken();
+            const staffDeviceToken = tokenManager.getStoredToken(); // CHANGED: variable name
             const targetMonth = document.getElementById('targetMonth').value;
             const shift = document.getElementById('shift').value;
             const availableWorkingDays = document.getElementById('availableWorkingDays').value.trim();
 
-            if (!staffId || !deviceToken) {
+            if (!staffId || !staffDeviceToken) {
                 showMessage('submissionMessage', 'Please register first', 'error');
                 return;
             }
@@ -378,7 +378,7 @@
                 return;
             }
 
-            console.log('Submitting:', { staffId, deviceToken, targetMonth, shift, availableWorkingDays });
+            console.log('Submitting:', { staffId, staffDeviceToken, targetMonth, shift, availableWorkingDays });
 
             try {
                 const response = await fetch(SUBMISSION_WEBHOOK, {
@@ -388,7 +388,7 @@
                     },
                     body: JSON.stringify({
                         staffId: staffId,
-                        deviceToken: deviceToken, // Use actual device token
+                        staffDeviceToken: staffDeviceToken, // CHANGED: deviceToken → staffDeviceToken
                         targetMonth: targetMonth,
                         shift: shift,
                         availableWorkingDays: availableWorkingDays,
@@ -405,10 +405,8 @@
                     document.getElementById('availableWorkingDays').value = '';
                 } else {
                     // Handle token mismatch (device changed)
-                    if (result.error && result.error.includes('token') || result.error && result.error.includes('device')) {
+                    if (result.error && (result.error.includes('token') || result.error.includes('device'))) {
                         showMessage('submissionMessage', `Device not registered. Please contact admin to reset.`, 'error');
-                        // Optionally clear local data
-                        // tokenManager.clearAllData();
                     } else {
                         showMessage('submissionMessage', `Submission failed: ${result.error || 'Unknown error'}`, 'error');
                     }
@@ -468,7 +466,7 @@
             populateMonthDropdown();
             loadStaffData();
             loadSettingsData();
-            console.log('PWA loaded successfully with device token management');
+            console.log('PWA loaded successfully with staffDeviceToken management');
             
             // Auto-switch to submission if already registered
             if (tokenManager.isDeviceRegistered()) {
