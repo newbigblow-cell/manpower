@@ -92,9 +92,11 @@
     </div>
 
     <script>
-        // Webhook URLs
-        const REGISTRATION_WEBHOOK = 'https://n8n.hdd.hk/webhook/manpower-staff-registration';
-        const SUBMISSION_WEBHOOK = 'https://n8n.hdd.hk/webhook/manpower-staff-submission';
+        // ✅ CORRECT: Webhook URLs WITH CORS PROXY
+        const REGISTRATION_WEBHOOK = 'https://corsproxy.io/?https://n8n.hdd.hk/webhook/manpower-staff-registration';
+        const SUBMISSION_WEBHOOK = 'https://corsproxy.io/?https://n8n.hdd.hk/webhook/manpower-staff-submission';
+
+        console.log('Webhook URLs:', { REGISTRATION_WEBHOOK, SUBMISSION_WEBHOOK });
 
         // Show/hide panels
         function showPanel(panelName) {
@@ -161,6 +163,9 @@
                 return;
             }
 
+            console.log('Registering staff:', { staffId, staffName, mobile });
+            console.log('Using URL:', REGISTRATION_WEBHOOK);
+
             try {
                 const response = await fetch(REGISTRATION_WEBHOOK, {
                     method: 'POST',
@@ -174,7 +179,9 @@
                     })
                 });
 
+                console.log('Response status:', response.status);
                 const result = await response.json();
+                console.log('Response data:', result);
 
                 if (response.ok) {
                     localStorage.setItem('staffId', staffId);
@@ -190,6 +197,7 @@
                     showMessage('registrationMessage', `Registration failed: ${result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
+                console.error('Registration error:', error);
                 showMessage('registrationMessage', `Registration error: ${error.message}`, 'error');
             }
         }
@@ -216,6 +224,8 @@
                 return;
             }
 
+            console.log('Submitting:', { staffId, targetMonth, shift, availableWorkingDays });
+
             try {
                 const response = await fetch(SUBMISSION_WEBHOOK, {
                     method: 'POST',
@@ -232,7 +242,9 @@
                     })
                 });
 
+                console.log('Submission response status:', response.status);
                 const result = await response.json();
+                console.log('Submission response data:', result);
 
                 if (response.ok && result.success) {
                     showMessage('submissionMessage', `Success! ${result.message}`, 'success');
@@ -241,6 +253,7 @@
                     showMessage('submissionMessage', `Submission failed: ${result.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
+                console.error('Submission error:', error);
                 showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
             }
         }
@@ -249,7 +262,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             populateMonthDropdown();
             loadStaffData();
-            console.log('PWA loaded successfully');
+            console.log('PWA loaded successfully with CORS proxy');
         });
     </script>
 </body>
