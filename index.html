@@ -187,12 +187,27 @@
             }
         }
 
-        // Show message
-        function showMessage(elementId, message, type) {
-            const messageElement = document.getElementById(elementId);
-            messageElement.textContent = message;
-            messageElement.className = `message ${type}`;
-        }
+       // Show message
+function showMessage(elementId, message, type) {
+    const messageElement = document.getElementById(elementId);
+    messageElement.textContent = message;
+    messageElement.className = `message ${type}`;
+    messageElement.style.display = 'block';
+    
+    // Auto-hide success messages after 5 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            hideMessage(elementId);
+        }, 5000);
+    }
+}
+
+// Hide message
+function hideMessage(elementId) {
+    const messageElement = document.getElementById(elementId);
+    messageElement.style.display = 'none';
+    messageElement.className = 'message';
+}
 
         // Hide message
         function hideMessage(elementId) {
@@ -414,45 +429,39 @@
                 const result = await response.json();
                 console.log('Response data:', result);
 
-                if (response.ok && result.success) {
-                    // Store all data including deviceToken
-                    localStorage.setItem('staffId', staffId);
-                    localStorage.setItem('staffName', staffName);
-                    localStorage.setItem('mobile', mobile);
-                    
-                    // Store the deviceToken from the response
-                    if (result.deviceToken) {
-                        localStorage.setItem('deviceToken', result.deviceToken);
-                        console.log('DeviceToken stored:', result.deviceToken);
-                    } else {
-                        console.warn('No deviceToken in response:', result);
-                    }
+if (response.ok && result.success) {
+    // Store all data including deviceToken
+    localStorage.setItem('staffId', staffId);
+    localStorage.setItem('staffName', staffName);
+    localStorage.setItem('mobile', mobile);
+    
+    // Store the deviceToken from the response
+    if (result.deviceToken) {
+        localStorage.setItem('deviceToken', result.deviceToken);
+        console.log('DeviceToken stored:', result.deviceToken);
+    } else {
+        console.warn('No deviceToken in response:', result);
+    }
 
-                    // Update display
-                    document.getElementById('displayStaffId').textContent = staffId;
-                    document.getElementById('displayStaffName').textContent = staffName;
-                    document.getElementById('displayMobile').textContent = mobile || 'Not provided';
-                    
-                    // Show only first character of deviceToken for security
-                    if (result.deviceToken && result.deviceToken.length > 0) {
-                        document.getElementById('displayDeviceToken').textContent = 
-                            result.deviceToken.charAt(0) + '•••••••••';
-                    } else {
-                        document.getElementById('displayDeviceToken').textContent = 'Not provided';
-                    }
+    // Update display
+    document.getElementById('displayStaffId').textContent = staffId;
+    document.getElementById('displayStaffName').textContent = staffName;
+    document.getElementById('displayMobile').textContent = mobile || 'Not provided';
+    
+    // Show only first character of deviceToken for security
+    if (result.deviceToken && result.deviceToken.length > 0) {
+        document.getElementById('displayDeviceToken').textContent = 
+            result.deviceToken.charAt(0) + '•••••••••';
+    } else {
+        document.getElementById('displayDeviceToken').textContent = 'Not provided';
+    }
 
-                    showMessage('registrationMessage', 'Registration successful!', 'success');
-                    setTimeout(() => showPanel('submission'), 2000);
-                } else {
-                    showMessage('registrationMessage', `Registration failed: ${result.message || 'Unknown error'}`, 'error');
-                }
-            } catch (error) {
-                console.error('Registration error:', error);
-                showMessage('registrationMessage', `Registration error: ${error.message}`, 'error');
-            } finally {
-                hideLoading('registerBtn', 'registerLoading');
-            }
-        }
+    showMessage('registrationMessage', 'Registration successful! Redirecting to submission...', 'success');
+    setTimeout(() => showPanel('submission'), 2000);
+} else {
+    const errorMessage = result.message || 'Unknown error occurred';
+    showMessage('registrationMessage', `Registration failed: ${errorMessage}`, 'error');
+}
 
         // Show confirmation modal
         function showConfirmationModal() {
@@ -523,23 +532,22 @@
                 const result = await response.json();
                 console.log('Submission response data:', result);
 
-                // Check both response status and result success
-                if (response.ok && result.success) {
-                    showMessage('submissionMessage', `Success! ${result.message}`, 'success');
-                    // Clear selection after successful submission
-                    selectedDays.clear();
-                    updateSelectedDaysDisplay();
-                    generateCalendar();
-                } else {
-                    showMessage('submissionMessage', `Submission failed: ${result.error || result.message || 'Unknown error'}`, 'error');
-                }
-            } catch (error) {
-                console.error('Submission error:', error);
-                showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
-            } finally {
-                hideLoading('submitBtn', 'submitLoading');
-            }
-        }
+           // Check both response status and result success
+if (response.ok && result.success) {
+    const successMessage = `Submission successful! 
+Staff ID: ${staffId}
+Target Month: ${targetMonth}
+Working Days: ${dayNumbers}`;
+    
+    showMessage('submissionMessage', successMessage, 'success');
+    // Clear selection after successful submission
+    selectedDays.clear();
+    updateSelectedDaysDisplay();
+    generateCalendar();
+} else {
+    const errorMessage = result.error || result.message || 'Unknown error occurred';
+    showMessage('submissionMessage', `Submission failed: ${errorMessage}`, 'error');
+}
 
         // Initialize app
         function initApp() {
@@ -584,3 +592,4 @@
     </script>
 </body>
 </html>
+
