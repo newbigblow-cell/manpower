@@ -24,21 +24,16 @@
         .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 6px; }
         .tab.active { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .message { padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
-        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .token-display { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-bottom: 16px; position: relative; }
-        .token-value { font-family: monospace; letter-spacing: 1px; }
-        .toggle-visibility { position: absolute; right: 12px; top: 12px; background: #6c757d; color: white; border: none; padding: 4px 8px; border-radius: 4px; font-size: 12px; cursor: pointer; }
-        .toggle-visibility:hover { background: #545b62; }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
     </style>
 </head>
 <body>
     <h1>Staff Management</h1>
 
     <div class="tab-switcher">
-        <div class="tab active" onclick="showPanel('registration')">Registration</div>
-        <div class="tab" onclick="showPanel('submission')">Submission</div>
-        <div class="tab" onclick="showPanel('settings')">Settings</div>
+        <div class="tab active" data-panel="registration">Registration</div>
+        <div class="tab" data-panel="submission">Submission</div>
     </div>
 
     <!-- Registration Panel -->
@@ -61,7 +56,7 @@
             <input type="tel" id="mobile" placeholder="Enter your mobile number">
         </div>
 
-        <button onclick="registerStaff()">Register</button>
+        <button id="registerBtn">Register</button>
     </div>
 
     <!-- Submission Panel -->
@@ -76,7 +71,9 @@
 
         <div class="form-group">
             <label for="targetMonth">Target Month:</label>
-            <select id="targetMonth"></select>
+            <select id="targetMonth">
+                <!-- Options will be populated by JavaScript -->
+            </select>
         </div>
 
         <div class="form-group">
@@ -89,126 +86,21 @@
         </div>
 
         <div class="form-group">
-            <label>Available Working Days (comma separated numbers):</label>
+            <label>Available Working Days (comma separated):</label>
             <input type="text" id="availableWorkingDays" placeholder="e.g., 1,2,3,5,7,8,10,12,13,14,15,18,19,20,22,23,25,26,27,28,30">
         </div>
 
-        <button onclick="submitWorkingDays()">Submit Working Days</button>
-    </div>
-
-    <!-- Settings Panel -->
-    <div class="container panel" id="settingsPanel">
-        <h2>Device Settings</h2>
-        <div id="settingsMessage" class="message"></div>
-
-        <div class="readonly-field">
-            <strong>Staff ID:</strong> <span id="settingsStaffId">-</span><br>
-            <strong>Name:</strong> <span id="settingsStaffName">-</span><br>
-            <strong>Mobile:</strong> <span id="settingsMobile">-</span>
-        </div>
-
-        <div class="token-display">
-            <strong>Device Token:</strong> 
-            <span id="staffDeviceTokenDisplay" class="token-value">••••••••</span>
-            <button class="toggle-visibility" onclick="toggleTokenVisibility()">Show</button>
-        </div>
-
-        <div class="form-group">
-            <button onclick="checkRegistrationStatus()">Check Registration Status</button>
-        </div>
-
-        <div class="form-group">
-            <button onclick="clearLocalData()" style="background: #dc3545;">Clear Local Data</button>
-        </div>
-
-        <div class="form-group">
-            <p style="font-size: 14px; color: #666; text-align: center;">
-                If you change device or have issues, contact admin to reset your registration.
-            </p>
-        </div>
+        <button id="submitBtn">Submit Working Days</button>
     </div>
 
     <script>
-        // ✅ CORRECT: Webhook URLs WITH CORS PROXY
+        // Webhook URLs
         const REGISTRATION_WEBHOOK = 'https://n8n.hdd.hk/webhook/manpower-staff-registration';
         const SUBMISSION_WEBHOOK = 'https://n8n.hdd.hk/webhook/manpower-staff-submission';
 
-        console.log('Webhook URLs:', { REGISTRATION_WEBHOOK, SUBMISSION_WEBHOOK });
-
-        // Device Token Manager
-        class DeviceTokenManager {
-            constructor() {
-                this.storageKey = 'manpowerStaffDeviceToken'; // Changed key name
-                this.tokenVisible = false;
-            }
-
-            // Generate a unique device token
-            generateDeviceToken() {
-                const timestamp = Date.now();
-                const random = Math.random().toString(36).substr(2, 9);
-                const userAgent = navigator.userAgent.substring(0, 3).replace(/[^a-zA-Z]/g, '');
-                return `staff-dev-${timestamp}-${random}-${userAgent}`;
-            }
-
-            // Get stored device token
-            getStoredToken() {
-                return localStorage.getItem(this.storageKey);
-            }
-
-            // Store device token
-            storeToken(token) {
-                localStorage.setItem(this.storageKey, token);
-            }
-
-            // Check if device is registered
-            isDeviceRegistered() {
-                const token = this.getStoredToken();
-                const staffId = localStorage.getItem('staffId');
-                return !!(token && staffId);
-            }
-
-            // Clear all local data
-            clearAllData() {
-                localStorage.removeItem('staffId');
-                localStorage.removeItem('staffName');
-                localStorage.removeItem('mobile');
-                localStorage.removeItem(this.storageKey);
-                this.tokenVisible = false;
-                this.updateTokenDisplay();
-            }
-
-            // Update token display in settings
-            updateTokenDisplay() {
-                const tokenDisplay = document.getElementById('staffDeviceTokenDisplay');
-                const storedToken = this.getStoredToken();
-                
-                if (storedToken) {
-                    if (this.tokenVisible) {
-                        tokenDisplay.textContent = storedToken;
-                    } else {
-                        // Show masked token (last 4 characters visible)
-                        const visiblePart = storedToken.substring(storedToken.length - 4);
-                        tokenDisplay.textContent = '••••••••' + visiblePart;
-                    }
-                } else {
-                    tokenDisplay.textContent = 'Not registered';
-                }
-            }
-
-            // Toggle token visibility
-            toggleVisibility() {
-                this.tokenVisible = !this.tokenVisible;
-                this.updateTokenDisplay();
-                const toggleBtn = document.querySelector('.toggle-visibility');
-                toggleBtn.textContent = this.tokenVisible ? 'Hide' : 'Show';
-            }
-        }
-
-        // Initialize device token manager
-        const tokenManager = new DeviceTokenManager();
-
         // Show/hide panels
         function showPanel(panelName) {
+            console.log('Showing panel:', panelName);
             document.querySelectorAll('.panel').forEach(panel => {
                 panel.classList.remove('active');
             });
@@ -217,12 +109,7 @@
             });
 
             document.getElementById(panelName + 'Panel').classList.add('active');
-            event.target.classList.add('active');
-
-            // Refresh settings panel when shown
-            if (panelName === 'settings') {
-                loadSettingsData();
-            }
+            document.querySelector(`[data-panel="${panelName}"]`).classList.add('active');
         }
 
         // Show message
@@ -230,14 +117,6 @@
             const messageElement = document.getElementById(elementId);
             messageElement.textContent = message;
             messageElement.className = `message ${type}`;
-            messageElement.style.display = 'block';
-            
-            // Auto-hide success messages after 5 seconds
-            if (type === 'success') {
-                setTimeout(() => {
-                    messageElement.style.display = 'none';
-                }, 5000);
-            }
         }
 
         // Populate month dropdown
@@ -260,7 +139,7 @@
             });
         }
 
-        // Load staff data for submission panel
+        // Load staff data
         function loadStaffData() {
             const savedStaffId = localStorage.getItem('staffId');
             const savedStaffName = localStorage.getItem('staffName');
@@ -271,24 +150,6 @@
                 document.getElementById('staffId').value = savedStaffId;
                 document.getElementById('staffName').value = savedStaffName;
             }
-        }
-
-        // Load settings data
-        function loadSettingsData() {
-            const savedStaffId = localStorage.getItem('staffId');
-            const savedStaffName = localStorage.getItem('staffName');
-            const savedMobile = localStorage.getItem('mobile');
-
-            document.getElementById('settingsStaffId').textContent = savedStaffId || '-';
-            document.getElementById('settingsStaffName').textContent = savedStaffName || '-';
-            document.getElementById('settingsMobile').textContent = savedMobile || '-';
-            
-            tokenManager.updateTokenDisplay();
-        }
-
-        // Toggle token visibility
-        function toggleTokenVisibility() {
-            tokenManager.toggleVisibility();
         }
 
         // Register staff
@@ -302,19 +163,9 @@
                 return;
             }
 
-            // Check if already registered locally
-            if (tokenManager.isDeviceRegistered()) {
-                showMessage('registrationMessage', 'Device already registered. Go to Settings panel.', 'error');
-                return;
-            }
-
             console.log('Registering staff:', { staffId, staffName, mobile });
-            console.log('Using URL:', REGISTRATION_WEBHOOK);
 
             try {
-                // Generate device token
-                const staffDeviceToken = tokenManager.generateDeviceToken();
-                
                 const response = await fetch(REGISTRATION_WEBHOOK, {
                     method: 'POST',
                     headers: {
@@ -323,9 +174,7 @@
                     body: JSON.stringify({
                         staffId: staffId,
                         staffName: staffName,
-                        mobile: mobile,
-                        staffDeviceToken: staffDeviceToken, // CHANGED: deviceToken → staffDeviceToken
-                        operation: 'complete_registration'
+                        mobile: mobile
                     })
                 });
 
@@ -333,21 +182,18 @@
                 const result = await response.json();
                 console.log('Response data:', result);
 
-                if (response.ok && result.success) {
-                    // Store data locally
+                if (response.ok) {
                     localStorage.setItem('staffId', staffId);
                     localStorage.setItem('staffName', staffName);
                     localStorage.setItem('mobile', mobile);
-                    tokenManager.storeToken(staffDeviceToken);
 
-                    // Update UI
                     document.getElementById('displayStaffId').textContent = staffId;
                     document.getElementById('displayStaffName').textContent = staffName;
 
                     showMessage('registrationMessage', 'Registration successful!', 'success');
                     setTimeout(() => showPanel('submission'), 2000);
                 } else {
-                    showMessage('registrationMessage', `Registration failed: ${result.message || result.error || 'Unknown error'}`, 'error');
+                    showMessage('registrationMessage', `Registration failed: ${result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
                 console.error('Registration error:', error);
@@ -356,35 +202,13 @@
         }
 
         // Submit working days
-
-
-// Add this to your submitWorkingDays function
-async function submitWorkingDays() {
-    // DEBUG: Check what token we have
-    const storedToken = tokenManager.getStoredToken();
-    const staffId = localStorage.getItem('staffId');
-    
-    console.log('DEBUG - Before submission:');
-    console.log('Stored staffId:', staffId);
-    console.log('Stored token:', storedToken);
-    console.log('Token length:', storedToken ? storedToken.length : 'none');
-    
-    if (!staffId || !storedToken) {
-        showMessage('submissionMessage', 'Please register first - no token found', 'error');
-        return;
-    }
-    
-    // Rest of your submission code...
-}
-
         async function submitWorkingDays() {
             const staffId = localStorage.getItem('staffId');
-            const staffDeviceToken = tokenManager.getStoredToken(); // CHANGED: variable name
             const targetMonth = document.getElementById('targetMonth').value;
             const shift = document.getElementById('shift').value;
             const availableWorkingDays = document.getElementById('availableWorkingDays').value.trim();
 
-            if (!staffId || !staffDeviceToken) {
+            if (!staffId) {
                 showMessage('submissionMessage', 'Please register first', 'error');
                 return;
             }
@@ -399,7 +223,7 @@ async function submitWorkingDays() {
                 return;
             }
 
-            console.log('Submitting:', { staffId, staffDeviceToken, targetMonth, shift, availableWorkingDays });
+            console.log('Submitting:', { staffId, targetMonth, shift, availableWorkingDays });
 
             try {
                 const response = await fetch(SUBMISSION_WEBHOOK, {
@@ -409,7 +233,7 @@ async function submitWorkingDays() {
                     },
                     body: JSON.stringify({
                         staffId: staffId,
-                        staffDeviceToken: staffDeviceToken, // CHANGED: deviceToken → staffDeviceToken
+                        deviceToken: 'web-token',
                         targetMonth: targetMonth,
                         shift: shift,
                         availableWorkingDays: availableWorkingDays,
@@ -425,12 +249,7 @@ async function submitWorkingDays() {
                     showMessage('submissionMessage', `Success! ${result.message}`, 'success');
                     document.getElementById('availableWorkingDays').value = '';
                 } else {
-                    // Handle token mismatch (device changed)
-                    if (result.error && (result.error.includes('token') || result.error.includes('device'))) {
-                        showMessage('submissionMessage', `Device not registered. Please contact admin to reset.`, 'error');
-                    } else {
-                        showMessage('submissionMessage', `Submission failed: ${result.error || 'Unknown error'}`, 'error');
-                    }
+                    showMessage('submissionMessage', `Submission failed: ${result.error || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
                 console.error('Submission error:', error);
@@ -438,63 +257,27 @@ async function submitWorkingDays() {
             }
         }
 
-        // Check registration status
-        async function checkRegistrationStatus() {
-            const staffId = localStorage.getItem('staffId');
-            
-            if (!staffId) {
-                showMessage('settingsMessage', 'No staff ID found locally', 'error');
-                return;
-            }
-
-            try {
-                const response = await fetch(REGISTRATION_WEBHOOK, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        staffId: staffId,
-                        operation: 'check_status'
-                    })
-                });
-
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showMessage('settingsMessage', `Status: ${result.status || 'Unknown'}`, 'success');
-                } else {
-                    showMessage('settingsMessage', `Check failed: ${result.error || 'Unknown error'}`, 'error');
-                }
-            } catch (error) {
-                console.error('Status check error:', error);
-                showMessage('settingsMessage', `Check error: ${error.message}`, 'error');
-            }
-        }
-
-        // Clear local data
-        function clearLocalData() {
-            if (confirm('Are you sure you want to clear all local data? You will need to register again.')) {
-                tokenManager.clearAllData();
-                loadStaffData();
-                loadSettingsData();
-                showMessage('settingsMessage', 'Local data cleared successfully', 'success');
-            }
-        }
-
-        // Initialize app when page loads
-        document.addEventListener('DOMContentLoaded', function() {
+        // Initialize app
+        function initApp() {
+            console.log('Initializing app...');
             populateMonthDropdown();
             loadStaffData();
-            loadSettingsData();
-            console.log('PWA loaded successfully with staffDeviceToken management');
+
+            // Add event listeners
+            document.getElementById('registerBtn').addEventListener('click', registerStaff);
+            document.getElementById('submitBtn').addEventListener('click', submitWorkingDays);
             
-            // Auto-switch to submission if already registered
-            if (tokenManager.isDeviceRegistered()) {
-                showPanel('submission');
-            }
-        });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    showPanel(this.getAttribute('data-panel'));
+                });
+            });
+
+            console.log('App initialized successfully');
+        }
+
+        // Start the app when page loads
+        document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
-
