@@ -69,6 +69,20 @@
             width: 100%;
             margin-bottom: 5px;
         }
+        
+        /* Debug info */
+        .debug-info {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -104,6 +118,8 @@
             <div class="spinner"></div>
             <p>Registering...</p>
         </div>
+        
+        <div class="debug-info" id="registrationDebug"></div>
     </div>
 
     <!-- Submission Panel -->
@@ -158,6 +174,8 @@
             <div class="spinner"></div>
             <p>Submitting...</p>
         </div>
+        
+        <div class="debug-info" id="submissionDebug"></div>
     </div>
 
     <!-- Confirmation Modal -->
@@ -185,6 +203,16 @@
         let selectedDays = new Set();
         let rangeStart = null;
         let rangeEnd = null;
+
+        // Debug logging
+        function logDebug(panel, message) {
+            const debugElement = document.getElementById(panel + 'Debug');
+            const timestamp = new Date().toLocaleTimeString();
+            debugElement.innerHTML += `[${timestamp}] ${message}<br>`;
+            debugElement.style.display = 'block';
+            debugElement.scrollTop = debugElement.scrollHeight;
+            console.log(`[${panel}] ${message}`);
+        }
 
         // Show/hide panels
         function showPanel(panelName) {
@@ -472,6 +500,7 @@
 
             showLoading('registerBtn', 'registerLoading');
             hideMessage('registrationMessage');
+            logDebug('registration', `Starting registration for staffId: ${staffId}`);
 
             console.log('Registering staff:', { staffId, staffName, mobile });
 
@@ -491,9 +520,13 @@
                 console.log('Response status:', response.status);
                 const result = await response.json();
                 console.log('Response data:', result);
+                
+                logDebug('registration', `Response status: ${response.status}`);
+                logDebug('registration', `Response data: ${JSON.stringify(result)}`);
 
                 // FIXED: Check both HTTP status AND the success field in response
                 if (response.ok && result.success) {
+                    logDebug('registration', 'Registration SUCCESS - both response.ok and result.success are true');
                     // Store all data including deviceToken
                     localStorage.setItem('staffId', staffId);
                     localStorage.setItem('staffName', staffName);
@@ -503,8 +536,10 @@
                     if (result.deviceToken) {
                         localStorage.setItem('deviceToken', result.deviceToken);
                         console.log('DeviceToken stored:', result.deviceToken);
+                        logDebug('registration', 'DeviceToken stored successfully');
                     } else {
                         console.warn('No deviceToken in response:', result);
+                        logDebug('registration', 'WARNING: No deviceToken in response');
                     }
 
                     // Update display
@@ -523,11 +558,13 @@
                     showMessage('registrationMessage', 'Registration successful! Redirecting to submission...', 'success');
                     setTimeout(() => showPanel('submission'), 2000);
                 } else {
+                    logDebug('registration', `Registration FAILED - response.ok: ${response.ok}, result.success: ${result.success}`);
                     // FIXED: Show error when success is false
                     showMessage('registrationMessage', `Registration failed: ${result.error || result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
                 console.error('Registration error:', error);
+                logDebug('registration', `Registration ERROR: ${error.message}`);
                 showMessage('registrationMessage', `Registration error: ${error.message}`, 'error');
             } finally {
                 hideLoading('registerBtn', 'registerLoading');
@@ -578,6 +615,11 @@
             const tokenToUse = deviceToken;
             console.log('Using deviceToken:', tokenToUse);
             console.log('Submitting:', { staffId, targetMonth, shift, availableWorkingDays: dayNumbers });
+            
+            logDebug('submission', `Starting submission for staffId: ${staffId}`);
+            logDebug('submission', `Target month: ${targetMonth}, Shift: ${shift}`);
+            logDebug('submission', `Working days: ${dayNumbers}`);
+            logDebug('submission', `Device token: ${tokenToUse ? 'Present' : 'MISSING'}`);
 
             showLoading('submitBtn', 'submitLoading');
             hideMessage('submissionMessage');
@@ -603,10 +645,14 @@
                 console.log('Submission response status:', response.status);
                 const result = await response.json();
                 console.log('Submission response data:', result);
+                
+                logDebug('submission', `Response status: ${response.status}`);
+                logDebug('submission', `Response data: ${JSON.stringify(result)}`);
 
                 // FIXED: Check both HTTP status AND the success field in response
                 // Your n8n returns 200 OK even for failed submissions, but with success: false
                 if (response.ok && result.success) {
+                    logDebug('submission', 'Submission SUCCESS - both response.ok and result.success are true');
                     showSuccessResult(staffId, targetMonth, dayNumbers);
                     showMessage('submissionMessage', `Submission successful!`, 'success');
                     
@@ -615,11 +661,14 @@
                     updateSelectedDaysDisplay();
                     generateCalendar();
                 } else {
+                    logDebug('submission', `Submission FAILED - response.ok: ${response.ok}, result.success: ${result.success}`);
                     // FIXED: This will now properly show error when success is false
-                    showMessage('submissionMessage', `Submission failed: ${result.error || result.message || 'Unknown error'}`, 'error');
+                    const errorMessage = result.error || result.message || 'Unknown error occurred';
+                    showMessage('submissionMessage', `Submission failed: ${errorMessage}`, 'error');
                 }
             } catch (error) {
                 console.error('Submission error:', error);
+                logDebug('submission', `Submission ERROR: ${error.message}`);
                 showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
             } finally {
                 hideLoading('submitBtn', 'submitLoading');
