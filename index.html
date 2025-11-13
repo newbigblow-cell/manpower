@@ -24,18 +24,17 @@
         .tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; border-radius: 6px; }
         .tab.active { background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .message { padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; }
-        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-        .debug-info { background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-family: monospace; font-size: 14px; }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; display: block; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; display: block; }
+        .device-token-info { background: #e7f3ff; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 14px; }
     </style>
 </head>
 <body>
     <h1>Staff Management</h1>
 
     <div class="tab-switcher">
-        <div class="tab active" onclick="showPanel('registration')">Registration</div>
-        <div class="tab" onclick="showPanel('submission')">Submission</div>
-        <div class="tab" onclick="showPanel('debug')">Debug</div>
+        <div class="tab active" data-panel="registration">Registration</div>
+        <div class="tab" data-panel="submission">Submission</div>
     </div>
 
     <!-- Registration Panel -->
@@ -58,7 +57,7 @@
             <input type="tel" id="mobile" placeholder="Enter your mobile number">
         </div>
 
-        <button onclick="registerStaff()">Register</button>
+        <button id="registerBtn">Register</button>
     </div>
 
     <!-- Submission Panel -->
@@ -69,12 +68,16 @@
         <div class="readonly-field">
             <strong>Staff ID:</strong> <span id="displayStaffId">-</span><br>
             <strong>Name:</strong> <span id="displayStaffName">-</span><br>
-            <strong>Device Token:</strong> <span id="displayDeviceToken">-</span>
+            <div class="device-token-info">
+                <strong>Device Token:</strong> <span id="displayDeviceToken">-</span>
+            </div>
         </div>
 
         <div class="form-group">
             <label for="targetMonth">Target Month:</label>
-            <select id="targetMonth"></select>
+            <select id="targetMonth">
+                <!-- Options will be populated by JavaScript -->
+            </select>
         </div>
 
         <div class="form-group">
@@ -87,47 +90,21 @@
         </div>
 
         <div class="form-group">
-            <label>Available Working Days (comma separated numbers):</label>
+            <label>Available Working Days (comma separated):</label>
             <input type="text" id="availableWorkingDays" placeholder="e.g., 1,2,3,5,7,8,10,12,13,14,15,18,19,20,22,23,25,26,27,28,30">
         </div>
 
-        <button onclick="submitWorkingDays()">Submit Working Days</button>
-    </div>
-
-    <!-- Debug Panel -->
-    <div class="container panel" id="debugPanel">
-        <h2>Debug Information</h2>
-        
-        <div class="debug-info">
-            <strong>Local Storage Contents:</strong><br>
-            <pre id="localStorageContents"></pre>
-        </div>
-
-        <div class="debug-info">
-            <strong>Last Registration Response:</strong><br>
-            <pre id="lastRegistrationResponse"></pre>
-        </div>
-
-        <div class="debug-info">
-            <strong>Last Submission Request:</strong><br>
-            <pre id="lastSubmissionRequest"></pre>
-        </div>
-
-        <button onclick="clearStorage()">Clear All Storage</button>
-        <button onclick="refreshDebugInfo()">Refresh Debug Info</button>
+        <button id="submitBtn">Submit Working Days</button>
     </div>
 
     <script>
-        // Webhook URLs with CORS proxy
-        const REGISTRATION_WEBHOOK = 'https://corsproxy.io/?https://n8n.hdd.hk/webhook/manpower-staff-registration';
-        const SUBMISSION_WEBHOOK = 'https://corsproxy.io/?https://n8n.hdd.hk/webhook/manpower-staff-submission';
-
-        // Store last responses for debugging
-        let lastRegistrationResponse = null;
-        let lastSubmissionRequest = null;
+        // Webhook URLs
+        const REGISTRATION_WEBHOOK = 'https://n8n.hdd.hk/webhook/manpower-staff-registration';
+        const SUBMISSION_WEBHOOK = 'https://n8n.hdd.hk/webhook/manpower-staff-submission';
 
         // Show/hide panels
         function showPanel(panelName) {
+            console.log('Showing panel:', panelName);
             document.querySelectorAll('.panel').forEach(panel => {
                 panel.classList.remove('active');
             });
@@ -136,11 +113,7 @@
             });
 
             document.getElementById(panelName + 'Panel').classList.add('active');
-            event.target.classList.add('active');
-
-            if (panelName === 'debug') {
-                refreshDebugInfo();
-            }
+            document.querySelector(`[data-panel="${panelName}"]`).classList.add('active');
         }
 
         // Show message
@@ -148,7 +121,6 @@
             const messageElement = document.getElementById(elementId);
             messageElement.textContent = message;
             messageElement.className = `message ${type}`;
-            messageElement.style.display = 'block';
         }
 
         // Populate month dropdown
@@ -180,7 +152,7 @@
             if (savedStaffId && savedStaffName) {
                 document.getElementById('displayStaffId').textContent = savedStaffId;
                 document.getElementById('displayStaffName').textContent = savedStaffName;
-                document.getElementById('displayDeviceToken').textContent = savedDeviceToken || 'NOT STORED';
+                document.getElementById('displayDeviceToken').textContent = savedDeviceToken || 'Not available';
                 document.getElementById('staffId').value = savedStaffId;
                 document.getElementById('staffName').value = savedStaffName;
             }
@@ -214,10 +186,7 @@
 
                 console.log('Response status:', response.status);
                 const result = await response.json();
-                
-                // Store the response for debugging
-                lastRegistrationResponse = result;
-                console.log('Registration Response:', result);
+                console.log('Response data:', result);
 
                 if (response.ok) {
                     // Store all data including deviceToken
@@ -225,7 +194,7 @@
                     localStorage.setItem('staffName', staffName);
                     localStorage.setItem('mobile', mobile);
                     
-                    // IMPORTANT: Store the deviceToken from the response
+                    // Store the deviceToken from the response
                     if (result.deviceToken) {
                         localStorage.setItem('deviceToken', result.deviceToken);
                         console.log('DeviceToken stored:', result.deviceToken);
@@ -236,7 +205,7 @@
                     // Update display
                     document.getElementById('displayStaffId').textContent = staffId;
                     document.getElementById('displayStaffName').textContent = staffName;
-                    document.getElementById('displayDeviceToken').textContent = result.deviceToken || 'NOT PROVIDED';
+                    document.getElementById('displayDeviceToken').textContent = result.deviceToken || 'Not provided';
 
                     showMessage('registrationMessage', 'Registration successful!', 'success');
                     setTimeout(() => showPanel('submission'), 2000);
@@ -272,18 +241,10 @@
                 return;
             }
 
-            // Store the request for debugging
-            lastSubmissionRequest = {
-                staffId: staffId,
-                deviceToken: deviceToken,
-                targetMonth: targetMonth,
-                shift: shift,
-                availableWorkingDays: availableWorkingDays,
-                status: 'updated'
-            };
-
-            console.log('Submitting with deviceToken:', deviceToken);
-            console.log('Full submission data:', lastSubmissionRequest);
+            // Use the stored deviceToken or fallback to 'web-token' if not available
+            const tokenToUse = deviceToken || 'web-token';
+            console.log('Using deviceToken:', tokenToUse);
+            console.log('Submitting:', { staffId, targetMonth, shift, availableWorkingDays });
 
             try {
                 const response = await fetch(SUBMISSION_WEBHOOK, {
@@ -291,7 +252,14 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(lastSubmissionRequest)
+                    body: JSON.stringify({
+                        staffId: staffId,
+                        deviceToken: tokenToUse, // Use the actual stored deviceToken
+                        targetMonth: targetMonth,
+                        shift: shift,
+                        availableWorkingDays: availableWorkingDays,
+                        status: 'updated'
+                    })
                 });
 
                 console.log('Submission response status:', response.status);
@@ -310,38 +278,27 @@
             }
         }
 
-        // Debug functions
-        function refreshDebugInfo() {
-            // Show localStorage contents
-            const storageContents = {};
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                storageContents[key] = localStorage.getItem(key);
-            }
-            document.getElementById('localStorageContents').textContent = JSON.stringify(storageContents, null, 2);
-            
-            // Show last registration response
-            document.getElementById('lastRegistrationResponse').textContent = JSON.stringify(lastRegistrationResponse, null, 2);
-            
-            // Show last submission request
-            document.getElementById('lastSubmissionRequest').textContent = JSON.stringify(lastSubmissionRequest, null, 2);
-        }
-
-        function clearStorage() {
-            localStorage.clear();
-            lastRegistrationResponse = null;
-            lastSubmissionRequest = null;
-            alert('All storage cleared!');
-            refreshDebugInfo();
-            loadStaffData();
-        }
-
-        // Initialize app when page loads
-        document.addEventListener('DOMContentLoaded', function() {
+        // Initialize app
+        function initApp() {
+            console.log('Initializing app...');
             populateMonthDropdown();
             loadStaffData();
-            console.log('PWA loaded successfully with debug features');
-        });
+
+            // Add event listeners
+            document.getElementById('registerBtn').addEventListener('click', registerStaff);
+            document.getElementById('submitBtn').addEventListener('click', submitWorkingDays);
+            
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    showPanel(this.getAttribute('data-panel'));
+                });
+            });
+
+            console.log('App initialized successfully');
+        }
+
+        // Start the app when page loads
+        document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
