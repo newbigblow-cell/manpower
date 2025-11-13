@@ -492,6 +492,7 @@
                 const result = await response.json();
                 console.log('Response data:', result);
 
+                // FIXED: Check both HTTP status AND the success field in response
                 if (response.ok && result.success) {
                     // Store all data including deviceToken
                     localStorage.setItem('staffId', staffId);
@@ -522,7 +523,8 @@
                     showMessage('registrationMessage', 'Registration successful! Redirecting to submission...', 'success');
                     setTimeout(() => showPanel('submission'), 2000);
                 } else {
-                    showMessage('registrationMessage', `Registration failed: ${result.message || result.error || 'Unknown error'}`, 'error');
+                    // FIXED: Show error when success is false
+                    showMessage('registrationMessage', `Registration failed: ${result.error || result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
                 console.error('Registration error:', error);
@@ -602,7 +604,8 @@
                 const result = await response.json();
                 console.log('Submission response data:', result);
 
-                // Check both response status and result success
+                // FIXED: Check both HTTP status AND the success field in response
+                // Your n8n returns 200 OK even for failed submissions, but with success: false
                 if (response.ok && result.success) {
                     showSuccessResult(staffId, targetMonth, dayNumbers);
                     showMessage('submissionMessage', `Submission successful!`, 'success');
@@ -612,7 +615,7 @@
                     updateSelectedDaysDisplay();
                     generateCalendar();
                 } else {
-                    // Fixed: Now properly shows error when success is false
+                    // FIXED: This will now properly show error when success is false
                     showMessage('submissionMessage', `Submission failed: ${result.error || result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
