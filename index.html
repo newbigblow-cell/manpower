@@ -53,6 +53,11 @@
         .calendar-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
         .calendar-nav { background: none; border: none; color: #007bff; font-size: 18px; cursor: pointer; width: auto; }
         .selected-days-summary { background: #f8f9fa; padding: 12px; border-radius: 8px; margin-top: 16px; }
+        
+        /* Success result display */
+        .result-display { background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #4caf50; }
+        .result-item { margin-bottom: 8px; }
+        .result-label { font-weight: bold; color: #2e7d32; }
     </style>
 </head>
 <body>
@@ -94,6 +99,7 @@
     <div class="container panel" id="submissionPanel">
         <h2>Submit Working Days</h2>
         <div id="submissionMessage" class="message"></div>
+        <div id="successResult" class="result-display" style="display: none;"></div>
 
         <div class="readonly-field">
             <strong>Staff ID:</strong> <span id="displayStaffId">-</span><br>
@@ -187,32 +193,43 @@
             }
         }
 
-       // Show message
-function showMessage(elementId, message, type) {
-    const messageElement = document.getElementById(elementId);
-    messageElement.textContent = message;
-    messageElement.className = `message ${type}`;
-    messageElement.style.display = 'block';
-    
-    // Auto-hide success messages after 5 seconds
-    if (type === 'success') {
-        setTimeout(() => {
-            hideMessage(elementId);
-        }, 5000);
-    }
-}
-
-// Hide message
-function hideMessage(elementId) {
-    const messageElement = document.getElementById(elementId);
-    messageElement.style.display = 'none';
-    messageElement.className = 'message';
-}
+        // Show message
+        function showMessage(elementId, message, type) {
+            const messageElement = document.getElementById(elementId);
+            messageElement.textContent = message;
+            messageElement.className = `message ${type}`;
+            messageElement.style.display = 'block';
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    hideMessage(elementId);
+                }, 5000);
+            }
+        }
 
         // Hide message
         function hideMessage(elementId) {
             const messageElement = document.getElementById(elementId);
             messageElement.style.display = 'none';
+            messageElement.className = 'message';
+        }
+
+        // Show success result
+        function showSuccessResult(staffId, targetMonth, workingDays) {
+            const resultElement = document.getElementById('successResult');
+            resultElement.innerHTML = `
+                <h3 style="margin-top: 0; color: #2e7d32;">Submission Successful!</h3>
+                <div class="result-item"><span class="result-label">Staff ID:</span> ${staffId}</div>
+                <div class="result-item"><span class="result-label">Target Month:</span> ${targetMonth}</div>
+                <div class="result-item"><span class="result-label">Working Days:</span> ${workingDays}</div>
+            `;
+            resultElement.style.display = 'block';
+        }
+
+        // Hide success result
+        function hideSuccessResult() {
+            document.getElementById('successResult').style.display = 'none';
         }
 
         // Show loading state
@@ -429,39 +446,45 @@ function hideMessage(elementId) {
                 const result = await response.json();
                 console.log('Response data:', result);
 
-if (response.ok && result.success) {
-    // Store all data including deviceToken
-    localStorage.setItem('staffId', staffId);
-    localStorage.setItem('staffName', staffName);
-    localStorage.setItem('mobile', mobile);
-    
-    // Store the deviceToken from the response
-    if (result.deviceToken) {
-        localStorage.setItem('deviceToken', result.deviceToken);
-        console.log('DeviceToken stored:', result.deviceToken);
-    } else {
-        console.warn('No deviceToken in response:', result);
-    }
+                if (response.ok && result.success) {
+                    // Store all data including deviceToken
+                    localStorage.setItem('staffId', staffId);
+                    localStorage.setItem('staffName', staffName);
+                    localStorage.setItem('mobile', mobile);
+                    
+                    // Store the deviceToken from the response
+                    if (result.deviceToken) {
+                        localStorage.setItem('deviceToken', result.deviceToken);
+                        console.log('DeviceToken stored:', result.deviceToken);
+                    } else {
+                        console.warn('No deviceToken in response:', result);
+                    }
 
-    // Update display
-    document.getElementById('displayStaffId').textContent = staffId;
-    document.getElementById('displayStaffName').textContent = staffName;
-    document.getElementById('displayMobile').textContent = mobile || 'Not provided';
-    
-    // Show only first character of deviceToken for security
-    if (result.deviceToken && result.deviceToken.length > 0) {
-        document.getElementById('displayDeviceToken').textContent = 
-            result.deviceToken.charAt(0) + '•••••••••';
-    } else {
-        document.getElementById('displayDeviceToken').textContent = 'Not provided';
-    }
+                    // Update display
+                    document.getElementById('displayStaffId').textContent = staffId;
+                    document.getElementById('displayStaffName').textContent = staffName;
+                    document.getElementById('displayMobile').textContent = mobile || 'Not provided';
+                    
+                    // Show only first character of deviceToken for security
+                    if (result.deviceToken && result.deviceToken.length > 0) {
+                        document.getElementById('displayDeviceToken').textContent = 
+                            result.deviceToken.charAt(0) + '•••••••••';
+                    } else {
+                        document.getElementById('displayDeviceToken').textContent = 'Not provided';
+                    }
 
-    showMessage('registrationMessage', 'Registration successful! Redirecting to submission...', 'success');
-    setTimeout(() => showPanel('submission'), 2000);
-} else {
-    const errorMessage = result.message || 'Unknown error occurred';
-    showMessage('registrationMessage', `Registration failed: ${errorMessage}`, 'error');
-}
+                    showMessage('registrationMessage', 'Registration successful! Redirecting to submission...', 'success');
+                    setTimeout(() => showPanel('submission'), 2000);
+                } else {
+                    showMessage('registrationMessage', `Registration failed: ${result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showMessage('registrationMessage', `Registration error: ${error.message}`, 'error');
+            } finally {
+                hideLoading('registerBtn', 'registerLoading');
+            }
+        }
 
         // Show confirmation modal
         function showConfirmationModal() {
@@ -510,6 +533,7 @@ if (response.ok && result.success) {
 
             showLoading('submitBtn', 'submitLoading');
             hideMessage('submissionMessage');
+            hideSuccessResult();
             hideConfirmationModal();
 
             try {
@@ -532,22 +556,25 @@ if (response.ok && result.success) {
                 const result = await response.json();
                 console.log('Submission response data:', result);
 
-           // Check both response status and result success
-if (response.ok && result.success) {
-    const successMessage = `Submission successful! 
-Staff ID: ${staffId}
-Target Month: ${targetMonth}
-Working Days: ${dayNumbers}`;
-    
-    showMessage('submissionMessage', successMessage, 'success');
-    // Clear selection after successful submission
-    selectedDays.clear();
-    updateSelectedDaysDisplay();
-    generateCalendar();
-} else {
-    const errorMessage = result.error || result.message || 'Unknown error occurred';
-    showMessage('submissionMessage', `Submission failed: ${errorMessage}`, 'error');
-}
+                // Check both response status and result success
+                if (response.ok && result.success) {
+                    showSuccessResult(staffId, targetMonth, dayNumbers);
+                    showMessage('submissionMessage', `Submission successful!`, 'success');
+                    
+                    // Clear selection after successful submission
+                    selectedDays.clear();
+                    updateSelectedDaysDisplay();
+                    generateCalendar();
+                } else {
+                    showMessage('submissionMessage', `Submission failed: ${result.error || result.message || 'Unknown error'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Submission error:', error);
+                showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
+            } finally {
+                hideLoading('submitBtn', 'submitLoading');
+            }
+        }
 
         // Initialize app
         function initApp() {
@@ -592,4 +619,3 @@ Working Days: ${dayNumbers}`;
     </script>
 </body>
 </html>
-
