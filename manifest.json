@@ -1,8 +1,16 @@
-{
-  "name": "Staff Management",
-  "short_name": "StaffApp",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#007bff"
+.message { 
+    padding: 12px; 
+    border-radius: 8px; 
+    margin-bottom: 16px; 
+    display: none; 
+}
+.message.success { 
+    background: #d4edda; 
+    color: #155724; 
+    border: 1px solid #c3e6cb; 
+}
+.message.error { 
+    background: #f8d7da; 
+    color: #721c24; 
+    border: 1px solid #f5c6cb; 
 }
