@@ -69,6 +69,12 @@
             width: 100%;
             margin-bottom: 5px;
         }
+        .submission-timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -226,22 +232,6 @@
             messageElement.className = 'message';
         }
 
-        // Check if response contains broken n8n templates
-        function hasBrokenTemplates(result) {
-            // Check for various broken template patterns
-            const brokenPatterns = [
-                '{{ $json.',
-                '[{ $json.',
-                '({ $json.',
-                '{${json.',
-                '${json.',
-                'if ${json.'
-            ];
-            
-            const jsonString = JSON.stringify(result);
-            return brokenPatterns.some(pattern => jsonString.includes(pattern));
-        }
-
         // Format working days to display in multiple lines
         function formatWorkingDays(dayNumbers) {
             const daysArray = dayNumbers.split(',');
@@ -272,19 +262,25 @@
             return result;
         }
 
-        // Show success result
-        function showSuccessResult(staffId, targetMonth, workingDays) {
+        // Show success result with echoed data from backend
+        function showSuccessResult(staffId, targetMonth, workingDays, submissionDate) {
             const resultElement = document.getElementById('successResult');
             const formattedDays = formatWorkingDays(workingDays);
             
+            let timestampHtml = '';
+            if (submissionDate) {
+                timestampHtml = `<div class="submission-timestamp">Recorded at: ${submissionDate}</div>`;
+            }
+            
             resultElement.innerHTML = `
-                <h3 style="margin-top: 0; color: #2e7d32;">Submission Successful!</h3>
+                <h3 style="margin-top: 0; color: #2e7d32;">Submission Verified Successfully!</h3>
                 <div class="result-item"><span class="result-label">Staff ID:</span> ${staffId}</div>
                 <div class="result-item"><span class="result-label">Target Month:</span> ${targetMonth}</div>
                 <div class="result-item">
                     <span class="result-label">Working Days:</span> 
                     <div class="working-days-list">${formattedDays}</div>
                 </div>
+                ${timestampHtml}
             `;
             resultElement.style.display = 'block';
         }
@@ -504,7 +500,7 @@
 
                 const result = await response.json();
 
-                if (response.ok && result.success && !hasBrokenTemplates(result)) {
+                if (response.ok && result.success) {
                     // Store all data including deviceToken
                     localStorage.setItem('staffId', staffId);
                     localStorage.setItem('staffName', staffName);
@@ -550,7 +546,7 @@
             document.getElementById('confirmationModal').style.display = 'none';
         }
 
-        // Submit working days (after confirmation)
+        // Submit working days (after confirmation) - WITH ECHO VERIFICATION
         async function submitWorkingDaysConfirmed() {
             const staffId = localStorage.getItem('staffId');
             const deviceToken = localStorage.getItem('deviceToken');
@@ -586,37 +582,71 @@
             hideConfirmationModal();
 
             try {
+                // Store what we're sending for verification
+                const submissionData = {
+                    staffId: staffId,
+                    targetMonth: targetMonth,
+                    availableWorkingDays: dayNumbers,
+                    deviceToken: tokenToUse,
+                    shift: shift,
+                    status: 'updated'
+                };
+
+                console.log('Sending submission:', submissionData);
+
                 const response = await fetch(SUBMISSION_WEBHOOK, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        staffId: staffId,
-                        deviceToken: tokenToUse,
-                        targetMonth: targetMonth,
-                        shift: shift,
-                        availableWorkingDays: dayNumbers,
-                        status: 'updated'
-                    })
+                    body: JSON.stringify(submissionData)
                 });
 
                 const result = await response.json();
+                console.log('Received response:', result);
 
-                // FIXED: Check for broken templates and treat as error
-                if (response.ok && result.success && !hasBrokenTemplates(result)) {
-                    showSuccessResult(staffId, targetMonth, dayNumbers);
-                    showMessage('submissionMessage', `Submission successful!`, 'success');
-                    
-                    // Clear selection after successful submission
-                    selectedDays.clear();
-                    updateSelectedDaysDisplay();
-                    generateCalendar();
+                // CRITICAL: Verify both success flag AND echoed data
+                if (response.ok && result.success) {
+                    // Verify that backend echoed our data correctly
+                    const isDataValid = 
+                        result.staffId === staffId &&
+                        result.targetMonth === targetMonth &&
+                        result.availableWorkingDays === dayNumbers;
+
+                    if (isDataValid) {
+                        // TRUE SUCCESS - show data echoed from backend
+                        showSuccessResult(
+                            result.staffId, 
+                            result.targetMonth, 
+                            result.availableWorkingDays,
+                            result.submissionDate // Optional timestamp from backend
+                        );
+                        showMessage('submissionMessage', `Submission verified successfully!`, 'success');
+                        
+                        // Clear selection after successful submission
+                        selectedDays.clear();
+                        updateSelectedDaysDisplay();
+                        generateCalendar();
+                    } else {
+                        // DATA MISMATCH - backend returned success but wrong data
+                        console.error('Data mismatch:', {
+                            sent: { staffId, targetMonth, availableWorkingDays: dayNumbers },
+                            received: { 
+                                staffId: result.staffId, 
+                                targetMonth: result.targetMonth, 
+                                availableWorkingDays: result.availableWorkingDays 
+                            }
+                        });
+                        showMessage('submissionMessage', 
+                            `Submission verification failed: Data mismatch with server response`, 'error');
+                    }
                 } else {
-                    // This handles both actual failures AND broken template responses
-                    showMessage('submissionMessage', `Submission failed: ${result.error || result.message || 'Server configuration error'}`, 'error');
+                    // Explicit failure from backend
+                    showMessage('submissionMessage', 
+                        `Submission failed: ${result.error || result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
+                console.error('Submission error:', error);
                 showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
             } finally {
                 hideLoading('submitBtn', 'submitLoading');
