@@ -69,20 +69,6 @@
             width: 100%;
             margin-bottom: 5px;
         }
-        
-        /* Debug info */
-        .debug-info {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 10px;
-            margin-top: 10px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -118,8 +104,6 @@
             <div class="spinner"></div>
             <p>Registering...</p>
         </div>
-        
-        <div class="debug-info" id="registrationDebug"></div>
     </div>
 
     <!-- Submission Panel -->
@@ -174,8 +158,6 @@
             <div class="spinner"></div>
             <p>Submitting...</p>
         </div>
-        
-        <div class="debug-info" id="submissionDebug"></div>
     </div>
 
     <!-- Confirmation Modal -->
@@ -203,16 +185,6 @@
         let selectedDays = new Set();
         let rangeStart = null;
         let rangeEnd = null;
-
-        // Debug logging
-        function logDebug(panel, message) {
-            const debugElement = document.getElementById(panel + 'Debug');
-            const timestamp = new Date().toLocaleTimeString();
-            debugElement.innerHTML += `[${timestamp}] ${message}<br>`;
-            debugElement.style.display = 'block';
-            debugElement.scrollTop = debugElement.scrollHeight;
-            console.log(`[${panel}] ${message}`);
-        }
 
         // Show/hide panels
         function showPanel(panelName) {
@@ -254,35 +226,20 @@
             messageElement.className = 'message';
         }
 
-        // Check if a string contains unevaluated n8n template expressions
-        function hasUnevaluatedTemplate(str) {
-            return str && (
-                str.includes('{{ $json.') || 
-                str.includes('[{ $json.') || 
-                str.includes('({ $json.') ||
-                str.includes('$json.')
-            );
-        }
-
-        // Extract meaningful error message from response
-        function extractErrorMessage(result) {
-            // If we have a proper error message, use it
-            if (result.error && !hasUnevaluatedTemplate(result.error)) {
-                return result.error;
-            }
+        // Check if response contains broken n8n templates
+        function hasBrokenTemplates(result) {
+            // Check for various broken template patterns
+            const brokenPatterns = [
+                '{{ $json.',
+                '[{ $json.',
+                '({ $json.',
+                '{${json.',
+                '${json.',
+                'if ${json.'
+            ];
             
-            // If we have a proper message, use it
-            if (result.message && !hasUnevaluatedTemplate(result.message)) {
-                return result.message;
-            }
-            
-            // If we have unevaluated templates, provide a generic error
-            if (hasUnevaluatedTemplate(result.error) || hasUnevaluatedTemplate(result.message)) {
-                return "Server configuration error - please contact administrator";
-            }
-            
-            // Default fallback
-            return "Unknown error occurred";
+            const jsonString = JSON.stringify(result);
+            return brokenPatterns.some(pattern => jsonString.includes(pattern));
         }
 
         // Format working days to display in multiple lines
@@ -531,9 +488,6 @@
 
             showLoading('registerBtn', 'registerLoading');
             hideMessage('registrationMessage');
-            logDebug('registration', `Starting registration for staffId: ${staffId}`);
-
-            console.log('Registering staff:', { staffId, staffName, mobile });
 
             try {
                 const response = await fetch(REGISTRATION_WEBHOOK, {
@@ -548,29 +502,16 @@
                     })
                 });
 
-                console.log('Response status:', response.status);
                 const result = await response.json();
-                console.log('Response data:', result);
-                
-                logDebug('registration', `Response status: ${response.status}`);
-                logDebug('registration', `Response data: ${JSON.stringify(result)}`);
 
-                // Check both HTTP status AND the success field in response
-                if (response.ok && result.success) {
-                    logDebug('registration', 'Registration SUCCESS - both response.ok and result.success are true');
+                if (response.ok && result.success && !hasBrokenTemplates(result)) {
                     // Store all data including deviceToken
                     localStorage.setItem('staffId', staffId);
                     localStorage.setItem('staffName', staffName);
                     localStorage.setItem('mobile', mobile);
                     
-                    // Store the deviceToken from the response
                     if (result.deviceToken) {
                         localStorage.setItem('deviceToken', result.deviceToken);
-                        console.log('DeviceToken stored:', result.deviceToken);
-                        logDebug('registration', 'DeviceToken stored successfully');
-                    } else {
-                        console.warn('No deviceToken in response:', result);
-                        logDebug('registration', 'WARNING: No deviceToken in response');
                     }
 
                     // Update display
@@ -578,7 +519,6 @@
                     document.getElementById('displayStaffName').textContent = staffName;
                     document.getElementById('displayMobile').textContent = mobile || 'Not provided';
                     
-                    // Show only first character of deviceToken for security
                     if (result.deviceToken && result.deviceToken.length > 0) {
                         document.getElementById('displayDeviceToken').textContent = 
                             result.deviceToken.charAt(0) + '•••••••••';
@@ -589,13 +529,9 @@
                     showMessage('registrationMessage', 'Registration successful! Redirecting to submission...', 'success');
                     setTimeout(() => showPanel('submission'), 2000);
                 } else {
-                    logDebug('registration', `Registration FAILED - response.ok: ${response.ok}, result.success: ${result.success}`);
-                    const errorMessage = extractErrorMessage(result);
-                    showMessage('registrationMessage', `Registration failed: ${errorMessage}`, 'error');
+                    showMessage('registrationMessage', `Registration failed: ${result.error || result.message || 'Unknown error'}`, 'error');
                 }
             } catch (error) {
-                console.error('Registration error:', error);
-                logDebug('registration', `Registration ERROR: ${error.message}`);
                 showMessage('registrationMessage', `Registration error: ${error.message}`, 'error');
             } finally {
                 hideLoading('registerBtn', 'registerLoading');
@@ -642,15 +578,7 @@
                 .sort((a, b) => a - b)
                 .join(',');
 
-            // Use the stored deviceToken
             const tokenToUse = deviceToken;
-            console.log('Using deviceToken:', tokenToUse);
-            console.log('Submitting:', { staffId, targetMonth, shift, availableWorkingDays: dayNumbers });
-            
-            logDebug('submission', `Starting submission for staffId: ${staffId}`);
-            logDebug('submission', `Target month: ${targetMonth}, Shift: ${shift}`);
-            logDebug('submission', `Working days: ${dayNumbers}`);
-            logDebug('submission', `Device token: ${tokenToUse ? 'Present' : 'MISSING'}`);
 
             showLoading('submitBtn', 'submitLoading');
             hideMessage('submissionMessage');
@@ -673,16 +601,10 @@
                     })
                 });
 
-                console.log('Submission response status:', response.status);
                 const result = await response.json();
-                console.log('Submission response data:', result);
-                
-                logDebug('submission', `Response status: ${response.status}`);
-                logDebug('submission', `Response data: ${JSON.stringify(result)}`);
 
-                // Check both HTTP status AND the success field in response
-                if (response.ok && result.success) {
-                    logDebug('submission', 'Submission SUCCESS - both response.ok and result.success are true');
+                // FIXED: Check for broken templates and treat as error
+                if (response.ok && result.success && !hasBrokenTemplates(result)) {
                     showSuccessResult(staffId, targetMonth, dayNumbers);
                     showMessage('submissionMessage', `Submission successful!`, 'success');
                     
@@ -691,13 +613,10 @@
                     updateSelectedDaysDisplay();
                     generateCalendar();
                 } else {
-                    logDebug('submission', `Submission FAILED - response.ok: ${response.ok}, result.success: ${result.success}`);
-                    const errorMessage = extractErrorMessage(result);
-                    showMessage('submissionMessage', `Submission failed: ${errorMessage}`, 'error');
+                    // This handles both actual failures AND broken template responses
+                    showMessage('submissionMessage', `Submission failed: ${result.error || result.message || 'Server configuration error'}`, 'error');
                 }
             } catch (error) {
-                console.error('Submission error:', error);
-                logDebug('submission', `Submission ERROR: ${error.message}`);
                 showMessage('submissionMessage', `Submission error: ${error.message}`, 'error');
             } finally {
                 hideLoading('submitBtn', 'submitLoading');
