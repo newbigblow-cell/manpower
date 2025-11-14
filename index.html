@@ -254,6 +254,37 @@
             messageElement.className = 'message';
         }
 
+        // Check if a string contains unevaluated n8n template expressions
+        function hasUnevaluatedTemplate(str) {
+            return str && (
+                str.includes('{{ $json.') || 
+                str.includes('[{ $json.') || 
+                str.includes('({ $json.') ||
+                str.includes('$json.')
+            );
+        }
+
+        // Extract meaningful error message from response
+        function extractErrorMessage(result) {
+            // If we have a proper error message, use it
+            if (result.error && !hasUnevaluatedTemplate(result.error)) {
+                return result.error;
+            }
+            
+            // If we have a proper message, use it
+            if (result.message && !hasUnevaluatedTemplate(result.message)) {
+                return result.message;
+            }
+            
+            // If we have unevaluated templates, provide a generic error
+            if (hasUnevaluatedTemplate(result.error) || hasUnevaluatedTemplate(result.message)) {
+                return "Server configuration error - please contact administrator";
+            }
+            
+            // Default fallback
+            return "Unknown error occurred";
+        }
+
         // Format working days to display in multiple lines
         function formatWorkingDays(dayNumbers) {
             const daysArray = dayNumbers.split(',');
@@ -524,7 +555,7 @@
                 logDebug('registration', `Response status: ${response.status}`);
                 logDebug('registration', `Response data: ${JSON.stringify(result)}`);
 
-                // FIXED: Check both HTTP status AND the success field in response
+                // Check both HTTP status AND the success field in response
                 if (response.ok && result.success) {
                     logDebug('registration', 'Registration SUCCESS - both response.ok and result.success are true');
                     // Store all data including deviceToken
@@ -559,8 +590,8 @@
                     setTimeout(() => showPanel('submission'), 2000);
                 } else {
                     logDebug('registration', `Registration FAILED - response.ok: ${response.ok}, result.success: ${result.success}`);
-                    // FIXED: Show error when success is false
-                    showMessage('registrationMessage', `Registration failed: ${result.error || result.message || 'Unknown error'}`, 'error');
+                    const errorMessage = extractErrorMessage(result);
+                    showMessage('registrationMessage', `Registration failed: ${errorMessage}`, 'error');
                 }
             } catch (error) {
                 console.error('Registration error:', error);
@@ -649,8 +680,7 @@
                 logDebug('submission', `Response status: ${response.status}`);
                 logDebug('submission', `Response data: ${JSON.stringify(result)}`);
 
-                // FIXED: Check both HTTP status AND the success field in response
-                // Your n8n returns 200 OK even for failed submissions, but with success: false
+                // Check both HTTP status AND the success field in response
                 if (response.ok && result.success) {
                     logDebug('submission', 'Submission SUCCESS - both response.ok and result.success are true');
                     showSuccessResult(staffId, targetMonth, dayNumbers);
@@ -662,8 +692,7 @@
                     generateCalendar();
                 } else {
                     logDebug('submission', `Submission FAILED - response.ok: ${response.ok}, result.success: ${result.success}`);
-                    // FIXED: This will now properly show error when success is false
-                    const errorMessage = result.error || result.message || 'Unknown error occurred';
+                    const errorMessage = extractErrorMessage(result);
                     showMessage('submissionMessage', `Submission failed: ${errorMessage}`, 'error');
                 }
             } catch (error) {
